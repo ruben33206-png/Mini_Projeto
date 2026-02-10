@@ -7,5 +7,5 @@ services:
     ports:
       - 8000:8000
     volumes:
-      - ../Mini_Projeto:/Mini_Projeto
+      - ../API_Mini_Project:/API_Mini_Project
     command: tail -f /dev/null

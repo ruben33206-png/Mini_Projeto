@@ -1,6 +1,6 @@
 FROM python:3.11.14-alpine3.23
 
-WORKDIR /Mini_Projeto
+WORKDIR /API_Mini_Project
 
 COPY requirements.txt .
 
