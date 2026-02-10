@@ -1,0 +1,11 @@
+services:
+  api:
+    image: "miniprojeto"
+    container_name: "Mini_Projeto"
+    expose:
+      - 8000
+    ports:
+      - 8000:8000
+    volumes:
+      - ../Mini_Projeto:/Mini_Projeto
+    command: tail -f /dev/null

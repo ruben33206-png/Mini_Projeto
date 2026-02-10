@@ -9,5 +9,5 @@ def read_root():
 
 @app.get("/teste")
 def teste_endpoint():
-    Teste = "Dado 1"
+    Teste = 1
     return {"Teste": Teste}
