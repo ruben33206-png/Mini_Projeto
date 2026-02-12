@@ -1,11 +1,11 @@
 services:
   api:
-    image: "miniprojeto"
-    container_name: "Mini_Projeto"
+    image: "taskhelper_api"
+    container_name: "TaskHelper_API"
     expose:
       - 8000
     ports:
       - 8000:8000
     volumes:
-      - ../API_Mini_Project:/API_Mini_Project
+      - ../TaskHelper_API:/TaskHelper_API
     command: tail -f /dev/null
