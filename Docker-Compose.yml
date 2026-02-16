@@ -6,6 +6,8 @@ services:
       - 8000
     ports:
       - 8000:8000
+    environment:
+      SQLALCHEMY_DATABASE_URL: "sqlite:////data/test.db"
     volumes:
       - ../TaskHelper_API:/TaskHelper_API
     command: tail -f /dev/null
