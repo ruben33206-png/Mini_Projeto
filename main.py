@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
-
+from fastapi import FastAPI
+from database import engine
+from models import Base
 
 app = FastAPI()
 
+# Cria as tabelas no banco
+Base.metadata.create_all(bind=engine)
 
 @app.get("/")
-def root():
-    return {"message": "API ligada!"}
+def read_root():
+    return {"message": "API funcionando 🚀"}
