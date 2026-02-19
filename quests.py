@@ -84,7 +84,7 @@ stardew_quests = [
 
 osrs_quests = [
     {
-        "questname": "Cook's Assistant",
+        "questname": "Cook's Assistant[F2P]",
         "questdescription": "Ajuda o cozinheiro do castelo.",
         "requirements": "Nenhum",
         "howtodoit": "Recolhe os ingredientes e entrega ao cozinheiro.",
@@ -92,7 +92,7 @@ osrs_quests = [
         "isdaily": False
     },
     {
-        "questname": "Sheep Shearer",
+        "questname": "Sheep Shearer[F2P]",
         "questdescription": "Ajuda o fazendeiro a obter lã.",
         "requirements": "Tesoura",
         "howtodoit": "Corta lã das ovelhas e entrega ao fazendeiro.",
@@ -100,7 +100,7 @@ osrs_quests = [
         "isdaily": False
     },
     {
-        "questname": "Romeo & Juliet",
+        "questname": "Romeo & Juliet[F2P]",
         "questdescription": "Ajuda Romeo a encontrar Juliet.",
         "requirements": "Nenhum",
         "howtodoit": "Segue a história e entrega as mensagens.",
