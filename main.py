@@ -7,6 +7,7 @@ from schemas import (
     UserOut,
     UserLogin,
     QuestOut,
+    QuestOutDaily,
     GameOut,
     CompletedQuest,
     CompletedGame,
@@ -21,7 +22,8 @@ from utils import add_xp_and_update_level, remove_xp_and_update_level
 from datetime import datetime
 from passlib.context import CryptContext
 from auth import create_access_token, get_current_user
-
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
@@ -29,7 +31,6 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
-
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -90,7 +91,6 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         "message": "Login efetuado com sucesso",
         "access_token": access_token,
         "token_type": "bearer",
-        "userid": db_user.userid,
         "username": db_user.username,
         "email": db_user.email,
         "currentxp": db_user.currentxp,
@@ -129,7 +129,7 @@ def quests_disponiveis(userid: str, db: Session = Depends(get_db), current_user:
         })
     return result
 
-@app.get("/quests/daily/{userid}", response_model=list[QuestOut])
+@app.get("/quests/daily/{userid}", response_model=list[QuestOutDaily])
 def quests_daily(userid: str, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     if userid != current_user:
         raise HTTPException(status_code=403, detail="Não autorizado")
@@ -143,8 +143,6 @@ def quests_daily(userid: str, db: Session = Depends(get_db), current_user: str =
         result.append({
             "questid": q.questid,
             "questname": q.questname,
-            "questdescription": q.questdescription,
-            "requirements": q.requirements,
             "howtodoit": q.howtodoit,
             "rewards": q.rewards,
             "isdaily": q.isdaily,
@@ -157,23 +155,51 @@ def quests_daily(userid: str, db: Session = Depends(get_db), current_user: str =
 XP_REWARD = 10
 
 @app.patch("/quests/check/{userid}/{questid}")
-def check_quest(userid: str, questid: int, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
+def check_quest(
+    userid: str,
+    questid: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     if userid != current_user:
         raise HTTPException(status_code=403, detail="Não autorizado")
 
-    user = db.query(User).filter(User.userid == userid).first()  # ← FALTAVA ISTO
+    user = db.query(User).filter(User.userid == userid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User não encontrado")
 
     quest = db.query(Quest).filter(Quest.questid == questid).first()
     if not quest:
         raise HTTPException(status_code=404, detail="Quest não encontrada")
 
-    already = db.query(UserQuest).filter(
-        UserQuest.userid == userid,
-        UserQuest.questid == questid
-    ).first()
+    # Se for quest normal → só pode completar uma vez na vida
+    if not quest.isdaily:
+        already = db.query(UserQuest).filter(
+            UserQuest.userid == userid,
+            UserQuest.questid == questid
+        ).first()
 
-    if already:
-        raise HTTPException(status_code=400, detail="Quest já foi completada")
+        if already:
+            raise HTTPException(status_code=400, detail="Quest já foi completada")
+
+    # Se for daily → pode 1x por dia
+    if quest.isdaily:
+        completed = db.query(UserQuest).filter(
+            UserQuest.userid == userid,
+            UserQuest.questid == questid
+        ).first()
+
+        if completed:
+            last_date = datetime.fromisoformat(completed.completedwhen).date()
+            today = datetime.now().date()
+
+            if last_date == today:
+                # já fez hoje
+                raise HTTPException(status_code=400, detail="Daily quest já foi completada hoje")
+            else:
+                # fez noutro dia → apagamos para poder registar de novo
+                db.delete(completed)
+                db.commit()
 
     user_quest = UserQuest(
         userid=userid,
@@ -195,12 +221,12 @@ def check_quest(userid: str, questid: int, db: Session = Depends(get_db), curren
         "currentlvl": user.currentlvl
     }
 
-@app.delete("/quests/unmark/{userid}/{questid}")
+@app.patch("/quests/uncheck/{userid}/{questid}")
 def unmark_quest(userid: str, questid: int, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     if userid != current_user:
         raise HTTPException(status_code=403, detail="Não autorizado")
 
-    user = db.query(User).filter(User.userid == userid).first()  # ← FALTAVA ISTO
+    user = db.query(User).filter(User.userid == userid).first()  
 
     completed_quest = db.query(UserQuest).filter(
         UserQuest.userid == userid,
@@ -262,7 +288,7 @@ def change_username(userid: str, data: ChangeUsername, db: Session = Depends(get
     if userid != current_user:
         raise HTTPException(status_code=403, detail="Não autorizado")
 
-    user = db.query(User).filter(User.userid == userid).first()  # ← FALTAVA ISTO
+    user = db.query(User).filter(User.userid == userid).first()
 
     user.username = data.new_username
     db.commit()
@@ -275,7 +301,7 @@ def change_email(userid: str, data: ChangeEmail, db: Session = Depends(get_db), 
     if userid != current_user:
         raise HTTPException(status_code=403, detail="Não autorizado")
 
-    user = db.query(User).filter(User.userid == userid).first()  # ← FALTAVA ISTO
+    user = db.query(User).filter(User.userid == userid).first()  
 
     email_exists = db.query(User).filter(User.email == data.new_email).first()
     if email_exists:
@@ -292,7 +318,7 @@ def change_password(userid: str, data: ChangePassword, db: Session = Depends(get
     if userid != current_user:
         raise HTTPException(status_code=403, detail="Não autorizado")
 
-    user = db.query(User).filter(User.userid == userid).first()  # ← FALTAVA ISTO
+    user = db.query(User).filter(User.userid == userid).first() 
 
     user.passencrypt = hash_password(data.new_password)
 
@@ -306,7 +332,7 @@ def delete_user(userid: str, data: DeleteUserRequest, db: Session = Depends(get_
     if userid != current_user:
         raise HTTPException(status_code=403, detail="Não autorizado")
 
-    user = db.query(User).filter(User.userid == userid).first()  # ← FALTAVA ISTO
+    user = db.query(User).filter(User.userid == userid).first() 
 
     if not verify_password(data.password, user.passencrypt):
         raise HTTPException(status_code=401, detail="Password incorreta")

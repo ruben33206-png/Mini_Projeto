@@ -41,6 +41,17 @@ class QuestOut(BaseModel):
     class Config:
         from_attributes = True
 
+class QuestOutDaily(BaseModel):
+    questid: int
+    questname: str
+    rewards: str
+    isdaily: bool
+    gameid: int
+    gamename: str  
+
+    class Config:
+        from_attributes = True
+
 class CompletedQuest(BaseModel):
     questid: int
     questname: str
