@@ -1,1 +1,6 @@
 docker exec -it TaskHelper_API /bin/sh #will enter in the container
+
+docker exec -it TaskHelperContainer_GUI bash
+cd TaskHelperContainer_GUI
+
+npm run dev

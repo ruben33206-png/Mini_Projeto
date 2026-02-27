@@ -24,6 +24,8 @@ from passlib.context import CryptContext
 from auth import create_access_token, get_current_user
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
+from fastapi.middleware.cors import CORSMiddleware
+
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
@@ -34,6 +36,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 def read_root():
@@ -50,10 +61,14 @@ def get_db():
 def registrar_usuario(user: UserCreate, db: Session = Depends(get_db)):
     user_exist = db.query(User).filter(User.email == user.email).first()
     if user_exist:
-        raise HTTPException(status_code=400, detail="Email já está registrado")
+        raise HTTPException(status_code=400, detail="Email já está registado")
+
+    username_exist = db.query(User).filter(User.username == user.username).first()
+    if username_exist:
+        raise HTTPException(status_code=400, detail="Username já está usado")
 
     novo_user = User(
-        userid=str(uuid.uuid4()), 
+        userid=str(uuid.uuid4()),
         username=user.username,
         email=user.email,
         passencrypt=hash_password(user.password),
@@ -65,7 +80,21 @@ def registrar_usuario(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(novo_user)
 
-    return {"message": "Usuário registrado com sucesso", "userid": novo_user.userid}
+    token = create_access_token(
+        data={"sub": novo_user.userid}
+    )
+
+    return {
+        "message": "Usuário registado com sucesso",
+        "token": token,
+        "token_type": "bearer",
+        "userid": novo_user.userid,
+        "username": novo_user.username,
+        "email": novo_user.email,
+        "currentxp": novo_user.currentxp,
+        "currentlvl": novo_user.currentlvl
+    }
+
 
 
 @app.get("/users", response_model=list[UserOut])
@@ -83,14 +112,15 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     if not verify_password(user.password, db_user.passencrypt):
         raise HTTPException(status_code=400, detail="Email/Password Incorretos")
 
-    access_token = create_access_token(
+    token = create_access_token(
         data={"sub": db_user.userid}
     )
 
     return {
         "message": "Login efetuado com sucesso",
-        "access_token": access_token,
+        "token": token,
         "token_type": "bearer",
+        "userid": db_user.userid,
         "username": db_user.username,
         "email": db_user.email,
         "currentxp": db_user.currentxp,
@@ -172,7 +202,6 @@ def check_quest(
     if not quest:
         raise HTTPException(status_code=404, detail="Quest não encontrada")
 
-    # Se for quest normal → só pode completar uma vez na vida
     if not quest.isdaily:
         already = db.query(UserQuest).filter(
             UserQuest.userid == userid,
@@ -182,7 +211,6 @@ def check_quest(
         if already:
             raise HTTPException(status_code=400, detail="Quest já foi completada")
 
-    # Se for daily → pode 1x por dia
     if quest.isdaily:
         completed = db.query(UserQuest).filter(
             UserQuest.userid == userid,
