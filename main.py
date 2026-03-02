@@ -116,11 +116,11 @@ def get_user_by_id(userid: str, db: Session = Depends(get_db)):
     }
 
 @app.put("/changegame/{userid}")
-def change_game(userid: str, data: ChangeGame, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
-    if userid != current_user:
-        raise HTTPException(status_code=403, detail="Não autorizado")
-
+def change_game(userid: str, data: ChangeGame, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.userid == userid).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User não encontrado")
 
     selected_game = db.query(Game).filter(Game.gameid == data.gameid).first()
     if not selected_game:
@@ -134,6 +134,7 @@ def change_game(userid: str, data: ChangeGame, db: Session = Depends(get_db), cu
         "message": "Jogo alterado com sucesso",
         "defaultGame": user.defaultGame
     }
+
 
 @app.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
