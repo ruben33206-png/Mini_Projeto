@@ -27,6 +27,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 from fastapi.middleware.cors import CORSMiddleware
 import re
+
+email_regex = r"^(?!\.)(?!.*\.\.)[\w\.-]+@[\w\.-]+\.\w+$"
+
+
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
@@ -63,6 +67,9 @@ def get_db():
 def registrar_usuario(user: UserCreate, db: Session = Depends(get_db)):
     if len(user.username) > 15:
         raise HTTPException(status_code=400, detail="O username deve ter no máximo 15 caracteres")
+    
+    if not re.match(email_regex, user.email): 
+        raise HTTPException(status_code=400, detail="Formato de email inválido")
 
     user_exist = db.query(User).filter(User.email == user.email).first()
     if user_exist:
@@ -390,7 +397,7 @@ def change_email(userid: str, data: ChangeEmail, db: Session = Depends(get_db), 
     if not verify_password(data.currentPass, user.passencrypt):
         raise HTTPException(status_code=400, detail="Password atual incorreta")
 
-    email_regex = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    email_regex = r"^(?!\.)(?!.*\.\.)[\w\.-]+@[\w\.-]+\.\w+$"
     if not re.match(email_regex, data.new_email):
         raise HTTPException(status_code=400, detail="Formato de email inválido")
 
